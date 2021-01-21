@@ -7,7 +7,7 @@ services:
       - ./db_data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: postgrespassword
-  graphql-engine:
+  hasura:
     image: hasura/graphql-engine:v1.3.3
     ports:
       - '8080:8080'
@@ -23,6 +23,41 @@ services:
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       ## uncomment next line to set an admin secret
       # HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
+    labels:
+      - traefik.http.routers.blog.rule=PathPrefix(`/v1/`)
+      - traefik.http.routers.blog.tls=true
+      - traefik.http.routers.blog.tls.certresolver=myresolver
+  traefik:
+    # The official v2 Traefik docker image
+    image: traefik:v2.3
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - '8082:80'
+      # The Web UI (enabled by --api.insecure=true)
+      - '8081:8080'
+    depends_on:
+      - hasura
+      - souin
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik_data/traefik.json:/acme.json
+  souin:
+    image: darkweak/souin:latest
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - redis
+    environment:
+      GOPATH: /app
+    volumes:
+      - ./traefik_data/traefik.json:/ssl/traefik.json
+  redis:
+    image: redis:alpine
+
 volumes:
   db_data:
     driver: local
