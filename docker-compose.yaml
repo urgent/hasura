@@ -1,5 +1,25 @@
 version: '3.6'
+
 services:
+  reverse-proxy:
+    image: 'traefik:v2.4'
+    command:
+      - '--log.level=DEBUG'
+      - '--api.insecure=true'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.websecure.address=:443'
+      - '--certificatesresolvers.myresolver.acme.tlschallenge=true'
+      #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - '--certificatesresolvers.myresolver.acme.email=urgent.programmer@gmail.com'
+      - '--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json'
+    ports:
+      - '443:443'
+      - '8080:8080'
+    volumes:
+      - './letsencrypt:/letsencrypt'
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+
   postgres:
     image: postgres:12
     restart: always
@@ -7,10 +27,9 @@ services:
       - ./db_data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: postgrespassword
-  hasura:
+
+  graphql-engine:
     image: hasura/graphql-engine:v1.3.3
-    ports:
-      - '8080:8080'
     depends_on:
       - 'postgres'
     restart: always
@@ -23,33 +42,11 @@ services:
       HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
       ## uncomment next line to set an admin secret
       # HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
-    labels:
-      - traefik.http.routers.blog.rule=PathPrefix(`/v1/`)
-  traefik:
-    # The official v2 Traefik docker image
-    image: traefik:v2.3
-    # Enables the web UI and tells Traefik to listen to docker
-    command: --providers.docker
-    depends_on:
-      - hasura
-    volumes:
-      # So that Traefik can listen to the Docker events
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./traefik_data/traefik.json:/acme.json
-  souin:
-    image: darkweak/souin:latest
     ports:
-      - 80:80
-      - 443:443
-    depends_on:
-      - redis
-    environment:
-      GOPATH: /app
-    volumes:
-      - ./traefik_data/traefik.json:/ssl/traefik.json
-  redis:
-    image: redis:alpine
-
-volumes:
-  db_data:
-    driver: local
+      - '8081:8080'
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.graphql-engine.rule=Host(`lading.thisbounty.com`) && PathPrefix(`/v1/`)'
+      - 'traefik.http.routers.graphql-engine.entrypoints=websecure'
+      - 'traefik.http.routers.graphql-engine.tls.certresolver=myresolver'
+      - 'traefik.http.services.graphql-engine.loadbalancer.server.port=8080'
