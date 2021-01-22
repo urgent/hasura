@@ -25,21 +25,13 @@ services:
       # HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
     labels:
       - traefik.http.routers.blog.rule=PathPrefix(`/v1/`)
-      - traefik.http.routers.blog.tls=true
-      - traefik.http.routers.blog.tls.certresolver=myresolver
   traefik:
     # The official v2 Traefik docker image
     image: traefik:v2.3
     # Enables the web UI and tells Traefik to listen to docker
-    command: --api.insecure=true --providers.docker
-    ports:
-      # The HTTP port
-      - '8082:80'
-      # The Web UI (enabled by --api.insecure=true)
-      - '8081:8080'
+    command: --providers.docker
     depends_on:
       - hasura
-      - souin
     volumes:
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
